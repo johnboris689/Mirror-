@@ -1,0 +1,259 @@
+#!/bin/bash
+#
+# A call an embedder can link must also be one it can declare, from the
+# installed headers alone: the four the release notes advertise (#1663) and the
+# threads, locks, charset and stats surface #1713 published, and the login
+# bundle calls. A missing declaration and a missing export are different
+# failures, so compile and link are separate steps here.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Unset means no automake run (the Windows job runs the scripts directly), so
+# there is no install rule to drive.
+[ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
+[ -f "$abs_top_builddir/src/Makefile" ] || fail "$abs_top_builddir/src is not configured"
+
+# CC carries flags on some legs ("gcc -m32", "ccache gcc"), so split it.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
+make=${MAKE:-make}
+command -v "$make" >/dev/null 2>&1 || skip "no make ($make)"
+
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+cpp_argv=(-I"$tmp/include")
+if [ -n "${TEST_CPPFLAGS:-}" ]; then
+    read -r -a extra_argv <<<"$TEST_CPPFLAGS"
+    cpp_argv+=("${extra_argv[@]}")
+fi
+# An embedder never defines this, and a declaration it gates is not installed API.
+cpp_argv+=(-UHTS_INTERNAL_BYTECODE -UHTS_INTERNAL_BUILD)
+# An undeclared call must be an error, not the warning older compilers default
+# to. One advertised call is deprecated on purpose, so that warning is off here
+# and the assertion further down checks the attribute is still there.
+strict_argv=(-Werror=implicit-function-declaration -Wno-deprecated-declarations)
+
+# Positive control: a box with no multilib libc (CC="gcc -m32") blames our
+# headers for everything otherwise.
+printf '#include <stdio.h>\nint main(void) { return puts("") < 0; }\n' >"$tmp/libc.c"
+"${cc_argv[@]}" "${cpp_argv[@]}" -fsyntax-only "$tmp/libc.c" 2>"$tmp/libc.log" || {
+    head -5 "$tmp/libc.log" >&2
+    echo "${cc_argv[*]} cannot compile a bare <stdio.h>, skipping" >&2
+    exit 77
+}
+
+# Override the install dir rather than DESTDIR: same rule and file list, no
+# prefix guessing. Empty MAKEFLAGS, or the sub-make hunts a jobserver it lacks.
+run_with_install_lock env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" \
+    install-DevIncludesDATA \
+    DevIncludesdir="$tmp/include/httrack" >"$tmp/install.log" 2>&1 ||
+    {
+        cat "$tmp/install.log" >&2
+        fail "install-DevIncludesDATA failed"
+    }
+[ -f "$tmp/include/httrack/httrack-library.h" ] || fail "httrack-library.h was not installed"
+
+# The consumer declares nothing of its own, so every name below comes from the
+# installed header, the whole hts_find* family included.
+cat >"$tmp/consumer.c" <<'EOF'
+#include <httrack/httrack-library.h>
+
+static void embedder_runner(void (*fun)(void *arg), void *arg) {
+  fun(arg);
+}
+
+static void embedder_worker(void *arg) {
+  (void) arg;
+}
+
+static void *embedder_enter(void) {
+  return NULL;
+}
+
+static void embedder_leave(void *cookie) {
+  (void) cookie;
+}
+
+/* Never run: it only has to compile and link. */
+int main(void) {
+  char path[] = ".";
+  hts_thread_runner previous = hts_set_thread_runner(embedder_runner);
+  httrackp *opt = hts_create_opt();
+  find_handle find = hts_findfirst(path);
+  hts_tristate completed = HTS_DEFAULT;
+  htsmutex lock = HTSMUTEX_INIT;
+  char *utf8 = hts_convertStringToUTF8("a", 1, "iso-8859-1");
+  const char *name = NULL;
+  LLint size = -1;
+  int truncated = -1;
+  int kinds = 0;
+  hts_paste_result login = {sizeof(hts_paste_result)};
+  char domain[256];
+
+  hts_set_thread_hooks(embedder_enter, embedder_leave);
+  hts_mutexinit(&lock);
+  hts_mutexlock(&lock);
+  hts_mutexrelease(&lock);
+  hts_mutexfree(&lock);
+  if (hts_newthread(embedder_worker, NULL) == 0)
+    htsthread_wait_n(0);
+
+  if (find != NULL) {
+    do {
+      name = hts_findgetname(find);
+      size = hts_findgetsize64(find);
+      truncated = hts_findgetsize(find);
+      kinds += hts_findisdir(find) + hts_findisfile(find)
+        + hts_findissystem(find);
+    } while (hts_findnext(find));
+    hts_findclose(find);
+  }
+  if (opt != NULL) {
+    completed = hts_mirror_completed(opt);
+    hts_free_opt(opt);
+  }
+  (void) hts_set_thread_runner(previous);
+  return name != NULL && size == 0 && truncated == 0 && kinds == 0
+    && completed == HTS_TRUE && utf8 != NULL && HTS_STAT.stat_errors == 0
+    && hts_file_is_newer(path, path)
+    && hts_bundle_from_paste("curl x", NULL, NULL, NULL, HTS_TRUE, &login)
+    && hts_bundle_name_refusal(login.name) == NULL
+    && hts_registrable_domain("example.com", domain, sizeof(domain));
+}
+EOF
+
+"${cc_argv[@]}" "${cpp_argv[@]}" "${strict_argv[@]}" \
+    -c -o "$tmp/consumer.o" "$tmp/consumer.c" 2>"$tmp/consumer.log" || {
+    cat "$tmp/consumer.log" >&2
+    fail "the installed headers do not declare the advertised calls"
+}
+
+# Negative control for the compile: an undeclared call has to be rejected.
+sed 's/hts_findgetsize64(find)/hts_no_such_call_1663(find)/' "$tmp/consumer.c" \
+    >"$tmp/undeclared.c"
+! "${cc_argv[@]}" "${cpp_argv[@]}" "${strict_argv[@]}" \
+    -c -o "$tmp/undeclared.o" "$tmp/undeclared.c" 2>/dev/null ||
+    fail "${cc_argv[*]} accepted an undeclared call, the compile above proved nothing"
+
+# hts_findgetsize is advertised as deprecated, so the attribute has to survive
+# the move. Only where this compiler enforces one it wrote itself.
+printf 'void ctl(void) __attribute__((deprecated));\nint main(void) { ctl(); return 0; }\n' \
+    >"$tmp/depctl.c"
+if "${cc_argv[@]}" -Werror=deprecated-declarations -c -o "$tmp/depctl.o" \
+    "$tmp/depctl.c" 2>/dev/null; then
+    echo "${cc_argv[*]} does not enforce deprecation; skipping that assertion" >&2
+else
+    ! "${cc_argv[@]}" "${cpp_argv[@]}" -Werror=deprecated-declarations \
+        -c -o "$tmp/dep.o" "$tmp/consumer.c" 2>/dev/null ||
+        fail "hts_findgetsize lost its deprecation on the way to the installed header"
+fi
+
+# Gated here rather than at the top, because only the link needs the library
+# and a --disable-shared build still has headers worth checking.
+lib=${HTTRACK_SHLIB:-}
+if [ ! -f "${lib:-/nonexistent}" ]; then
+    # A Darwin build names it .dylib, which HTTRACK_SHLIB does not cover.
+    for cand in "$abs_top_builddir"/src/.libs/libhttrack.dylib \
+        "$abs_top_builddir"/src/.libs/libhttrack.so; do
+        if [ -f "$cand" ]; then
+            lib=$cand
+            break
+        fi
+    done
+fi
+if [ ! -f "${lib:-/nonexistent}" ]; then
+    echo "the installed headers declare the advertised calls" \
+        "(no shared libhttrack, so the link was not checked)"
+    exit 0
+fi
+
+"${cc_argv[@]}" -o "$tmp/consumer" "$tmp/consumer.o" "$lib" 2>"$tmp/ld.log" || {
+    cat "$tmp/ld.log" >&2
+    fail "$lib does not export the advertised calls"
+}
+
+# Negative control for the link: a name nothing defines has to be rejected.
+{
+    printf '#include <httrack/httrack-library.h>\n'
+    printf 'extern int hts_no_such_export_1663(void);\n'
+    printf 'int main(void) { return hts_no_such_export_1663(); }\n'
+} >"$tmp/unexported.c"
+"${cc_argv[@]}" "${cpp_argv[@]}" -c -o "$tmp/unexported.o" "$tmp/unexported.c" \
+    2>"$tmp/unexported.log" || {
+    head -5 "$tmp/unexported.log" >&2
+    fail "the link control does not compile"
+}
+! "${cc_argv[@]}" -o "$tmp/unexported" "$tmp/unexported.o" "$lib" 2>/dev/null ||
+    fail "${cc_argv[*]} linked an undefined symbol, the link above proved nothing"
+
+# The login bundle calls also run from outside the library.
+cat >"$tmp/login.c" <<'EOF'
+#include <stdio.h>
+#include <httrack/httrack-library.h>
+
+int main(void) {
+  hts_paste_result res = {sizeof(hts_paste_result)};
+  hts_paste_result small = {sizeof(hts_paste_result) - 1};
+  char domain[64];
+  hts_boolean ok;
+  char **names;
+  int n;
+  const char *paste = "curl 'https://www.shop.example.co.uk/' -b 'SID=1'";
+  const char *url = "https://www.shop.example.co.uk/";
+
+  hts_init();
+  printf("%d\n", hts_bundle_cookie_in_scope(&url, 1, ".example.co.uk"));
+  printf("%d %s\n", hts_registrable_domain("a.example.co.uk", domain,
+                                            sizeof(domain)), domain);
+  printf("%s\n", hts_bundle_name_refusal("con") != NULL ? "refused" : "ok");
+  ok = hts_bundle_from_paste(paste, NULL, NULL, NULL, HTS_TRUE, &res);
+  printf("%d %s %d %s\n", ok, res.name, res.cookies, res.hosts);
+  ok = hts_bundle_from_paste(paste, NULL, NULL, NULL, HTS_TRUE, &small);
+  printf("%d\n", ok);
+  ok = hts_bundle_from_paste_flags(NULL, NULL, NULL, url,
+                                   HTS_PASTE_DRY_RUN | HTS_PASTE_KEEP_EMPTY,
+                                   &res);
+  printf("%d %s %d\n", ok, res.name, res.cookies);
+  ok = hts_bundle_from_paste_flags(paste, NULL, NULL, NULL,
+                                   HTS_PASTE_DRY_RUN | 4u, &res);
+  printf("%d %s\n", ok, res.error);
+  n = hts_bundle_names_in_use("http://a/#httrack-bundle=shop", NULL, &names,
+                              NULL, 0);
+  printf("%d %s\n", n, names[0]);
+  hts_bundle_names_free(names);
+  domain[0] = 'X';
+  printf("%d %d %c\n",
+         hts_bundle_names_in_use("-V", NULL, &names, NULL, 0),
+         hts_bundle_names_in_use("-V", NULL, &names, domain, 0), domain[0]);
+  hts_uninit();
+  return 0;
+}
+EOF
+# It runs, so it needs the build's own flags: a sanitized library needs the runtime.
+login_argv=()
+[ -z "${TEST_CFLAGS:-}" ] || read -r -a login_argv <<<"$TEST_CFLAGS"
+"${cc_argv[@]}" "${cpp_argv[@]}" ${login_argv[@]+"${login_argv[@]}"} \
+    -o "$tmp/login" "$tmp/login.c" "$lib" \
+    -Wl,-rpath,"${lib%/*}" 2>"$tmp/login.log" || {
+    cat "$tmp/login.log" >&2
+    fail "the login bundle program does not build"
+}
+got=$(LD_LIBRARY_PATH="${lib%/*}" DYLD_LIBRARY_PATH="${lib%/*}" "$tmp/login")
+want="1
+1 example.co.uk
+refused
+1 example.co.uk 1 example.co.uk
+0
+1 example.co.uk 0
+0 unknown flags 0x5
+1 shop
+-1 -1 X"
+test "$got" = "$want" || fail "the login bundle calls from outside: [$got]"
+
+echo "an embedder compiled and linked the advertised calls from the installed headers"
+
+exit 0

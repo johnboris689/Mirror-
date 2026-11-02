@@ -1,0 +1,27 @@
+#!/bin/bash
+#
+# Dates on both sides of 2038 read correctly, and clip on a 32-bit time_t.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_y2038.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmpdir"
+
+out=$(httrack -O "${tmpdir}/o1" -#test=y2038 "${tmpdir}/data" 2>&1) || {
+    echo "FAIL: y2038 exited non-zero: ${out}"
+    exit 1
+}
+case "$out" in
+*"y2038: OK"*) ;;
+*)
+    echo "FAIL: ${out}"
+    exit 1
+    ;;
+esac
+# A filesystem that clips dates past 2038 skips the file checks: say so.
+case "$out" in
+*skipped*) echo "$out" ;;
+esac

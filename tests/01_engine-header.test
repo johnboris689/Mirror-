@@ -1,0 +1,55 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Response header-line parsing (treathead via -#test=header <raw-line> ...).
+# Isolates the wire layer from url_savename, which strips traversal on its own.
+
+hdr() {
+    local want=$1 got
+    shift
+    # Assigned, not passed inline: set -e sees a failing engine only in an assignment.
+    got=$(httrack -O /dev/null -#test=header "$@" | grep '^contenttype=')
+    assert_eq "$want" "$got" "$*"
+}
+
+hdr 'contenttype=application/pdf cdispo=' 'Content-Type: application/pdf'
+
+# A status line must carry exactly three digits after the HTTP/ token.
+selftest_queue 'code=200' statusline 'HTTP/1.1 200 Connection established'
+selftest_queue 'code=204' statusline '  HTTP/1.0 204'
+selftest_queue 'code=407' statusline 'http/1.1 407 Proxy Authentication Required'
+selftest_queue 'code=-1' statusline 'HTTP/1.1 4294967496 Connection established'
+selftest_queue 'code=-1' statusline 'HTTP/1.1 2000 OK'
+selftest_queue 'code=-1' statusline 'HTTP/1.1 0200 OK'
+selftest_queue 'code=-1' statusline 'HTTP/1.1 +200 OK'
+selftest_queue 'code=-1' statusline 'HTTP/1.1 20 OK'
+selftest_queue 'code=-1' statusline 'HTTP/1.1'
+selftest_queue 'code=-1' statusline 'ICY 200 OK'
+
+# filename= is honored quoted or bare.
+hdr 'contenttype= cdispo=report.pdf' \
+    'Content-Disposition: attachment; filename="report.pdf"'
+hdr 'contenttype= cdispo=report.pdf' \
+    'Content-Disposition: attachment; filename=report.pdf'
+
+# Path components in the filename are dropped on the wire (RFC 2616).
+hdr 'contenttype= cdispo=evil.pdf' \
+    'Content-Disposition: attachment; filename="../../evil.pdf"'
+
+# An over-long header value must not overflow the parse scratch (ASan aborts
+# here on the pre-fix binary).
+selftest_queue 'contenttype_len=32 contentencoding_len=0' headerlong 'Content-Type:'
+selftest_queue 'contenttype_len=0 contentencoding_len=0' headerlong 'Content-Encoding:'
+
+# An empty Content-Encoding yields no token: leave it empty, don't read the
+# uninitialized scratch (MSan aborts here on the pre-fix binary).
+enc() { httrack -O /dev/null -#test=header "$1" | grep '^contentencoding='; }
+assert_eq 'contentencoding=' "$(enc 'Content-Encoding:')"
+assert_eq 'contentencoding=gzip' "$(enc 'Content-Encoding: gzip')"
+
+selftest_run_queued

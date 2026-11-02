@@ -1,63 +1,43 @@
+# HTTrack Website Copier - Development Repository
 
-## Recent SiteForge AI UI / Reconstruction Updates
+[![CI](https://github.com/xroche/httrack/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/xroche/httrack/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/xroche/httrack)](COPYING)
 
-- Analyzer URL input starts empty instead of pre-filling `https://example.com`.
-- Completed analyses expose **Download ZIP** and **Recreate with AI** together.
-- Recreate with AI opens a chat-style reconstruction workspace, automatically starts source analysis, and provides a **Review** view plus GitHub publishing.
-- Login and signup now use full-screen layouts with icon-only GitHub and Google provider buttons.
-- The user-facing Developer API/keys screen, Admin Console, and old standalone analyzer component were removed from the web UI.
-- Notifications can be opened as full-detail dialogs.
-- Website capture now accepts larger files, crawls deeper/more pages from the main analyzer, captures additional public resource references, and emits `SOURCE_CAPTURE_MANIFEST.json`.
-- AI reconstruction receives substantially more extracted HTML/source context and is instructed to preserve captured assets/routes rather than falling back to a generic template.
+## About
+_Copy websites to your computer (Offline browser)_
 
-# SiteForge AI — Website Analyzer, Source Code Exporter, AI Reconstruction & GitHub Sync Platform
+<img src="https://www.httrack.com/htsw/screenshot_w1.jpg" width="34%">
 
-**SiteForge AI** is a production-grade full-stack developer SaaS platform for analyzing authorized websites, extracting their publicly accessible structure and assets, exporting clean modular source code, reconstructing full-stack applications with AI, and pushing generated repositories directly to **GitHub**.
+*HTTrack* is an _offline browser_ utility, allowing you to download a World Wide website from the Internet to a local directory, building recursively all directories, getting html, images, and other files from the server to your computer.
+ 
+*HTTrack* arranges the original site's relative link-structure. Simply open a page of the "mirrored" website in your browser, and you can browse the site from link to link, as if you were viewing it online.
 
----
+HTTrack can also update an existing mirrored site, and resume interrupted downloads. HTTrack is fully configurable, and has an integrated help system.
 
-## Architecture Overview
+*WinHTTrack* is the Windows front end and *WebHTTrack* the one for Linux, BSD and macOS, where it also arrives with `brew install httrack` and in the release DMG. There is an [Android app](https://play.google.com/store/apps/details?id=com.httrack.android) too, and underneath all of them the `httrack` command line.
 
-- **Frontend**: React 19 + TypeScript + Tailwind CSS v4 + Lucide Icons
-- **Backend**: Express 4 + Node.js (`tsx server.ts`) listening on `0.0.0.0:$PORT`
-- **Database**: PostgreSQL + Drizzle ORM (`src/db/schema.ts`) with automatic non-destructive startup schema verification (`ensureDatabaseSchema()`)
-- **Authentication**: GitHub-first OAuth 2.0 (`Continue with GitHub`) with AES-256-GCM encrypted token storage at rest, plus bcrypt-hashed email/password and single-use reset tokens
-- **GitHub Integration**: Real GitHub REST & Git Data API integration (`src/server/github.ts`) supporting 1-click repository creation (public/private), multi-file Git tree commits, branch reference updates, and subsequent resync commits
-- **Website Crawler & Analyzer**: Real HTTP fetcher + Cheerio DOM parser + DNS SSRF protection (`src/server/crawler.ts`)
-- **AI Reconstruction Engine**: Pluggable `AIProvider` adapter (`src/server/ai-provider.ts`) powered by `@google/genai` (`gemini-3.8-flash`)
-- **Archive & Export Engine**: Validated `.zip` package generator using `JSZip` (`src/server/zip-builder.ts`)
+## Website
 
----
+*Main Website:*
+https://www.httrack.com/
 
-## Render Production Deployment
+## Compile trunk release
 
-This repository includes a production `render.yaml` blueprint configured as a **Render Web Service** + **Render PostgreSQL** database:
+A git checkout ships only the autotools sources, so `./bootstrap` (which runs
+`autoreconf`) regenerates `configure` first; this needs autoconf, automake and
+libtool. Released tarballs already include `configure`, so building from a
+tarball skips `./bootstrap`.
 
-- **Build Command**: `npm install && npm run build`
-- **Start Command**: `npm run start`
-- **Health Check Path**: `/health`
-- **Readiness Check Path**: `/ready`
-- **Host / Port Binding**: `0.0.0.0:$PORT`
+```sh
+git clone https://github.com/xroche/httrack.git --recurse-submodules
+cd httrack
+./bootstrap
+./configure --prefix=$HOME/usr && make -j8 && make install
+```
 
-### Required Environment Variables
+Or use the one-shot wrapper (bootstrap + configure + make), which forwards its
+arguments to `configure`:
 
-| Variable | Description |
-| :--- | :--- |
-| `DATABASE_URL` | PostgreSQL connection string (`postgresql://...`) |
-| `SESSION_SECRET` | Secret used for session hashing and AES-256-GCM GitHub token encryption at rest |
-| `GEMINI_API_KEY` | Google Gemini API key for AI website reconstruction and code refactoring |
-| `GITHUB_CLIENT_ID` | GitHub OAuth App Client ID |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth App Client Secret |
-| `GITHUB_CALLBACK_URL` | Optional explicit callback URL (`https://<your-domain>/auth/github/callback`) |
-
----
-
-## Local Development & Verification
-
-```bash
-npm install
-npm run lint
-npm test
-npm run build
-npm run start
+```sh
+./build.sh --prefix=$HOME/usr
 ```

@@ -1,0 +1,22 @@
+version: 2
+updates:
+  # Bumps builtin-baseline in src/vcpkg.json so the pinned OpenSSL/zlib can't rot.
+  # windows-build.yml validates each bump, and the pin makes what ships
+  # reproducible. These are not auto-merged, because this ecosystem can bump the
+  # baseline backwards: see dependabot-automerge.yml.
+  - package-ecosystem: vcpkg
+    directory: /src
+    schedule:
+      interval: weekly
+
+  # Keep the workflow action pins current (they only rot manually otherwise).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # src/coucal is a hard build dependency, and nothing else notices when it moves.
+  - package-ecosystem: gitsubmodule
+    directory: /
+    schedule:
+      interval: weekly
