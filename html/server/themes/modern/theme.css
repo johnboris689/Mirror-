@@ -1,5 +1,5 @@
-/* WebHTTrack Modern theme.
-   Uses the native WebHTTrack pages, shared palette and theme hooks only.
+/* WebMirror Modern theme.
+   Uses the native WebMirror pages, shared palette and theme hooks only.
    Page and attribute tests sit in :where(), so a user stylesheet's plain
    #pageContent rules override them. */
 
@@ -19,7 +19,7 @@
   --chip: #eaf1ff;
   --shadow: rgba(22, 45, 82, .12);
 
-  /* Native WebHTTrack hooks from style.css. */
+  /* Native WebMirror hooks from style.css. */
   --ui-ink: var(--ink);
   --ui-link: var(--link);
   --ui-visited: #52647f;

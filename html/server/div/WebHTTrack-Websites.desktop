@@ -4,10 +4,10 @@ Type=Application
 Categories=Network;
 Terminal=false
 Name=Browse Mirrored Websites
-Comment=Browse Websites Mirrored by WebHTTrack
+Comment=Browse Websites Mirrored by WebMirror
 Keywords=browse mirrored;
 Exec=webhttrack browse
 Icon=httrack
-# Helper launcher for WebHTTrack's browse mode, not a standalone app: keep it
+# Helper launcher for WebMirror's browse mode, not a standalone app: keep it
 # out of software-center catalogs so it doesn't duplicate the main entry.
 X-AppStream-Ignore=true

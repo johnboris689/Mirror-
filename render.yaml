@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: mirror
+    runtime: docker
+    plan: starter
+    healthCheckPath: /
+    disk:
+      name: mirror-data
+      mountPath: /data
+      sizeGB: 10

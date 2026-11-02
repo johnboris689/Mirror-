@@ -1,0 +1,40 @@
+name: Android native engine build
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android NDK and CMake
+        run: sdkmanager "platforms;android-35" "ndk;27.2.12479018" "cmake;3.22.1"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build Android OpenSSL dependencies
+        env:
+          MIRROR_OPENSSL_ROOT: ${{ github.workspace }}/.android-openssl
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018"
+          ./android/scripts/build-openssl.sh
+      - name: Build native Android app
+        working-directory: android
+        env:
+          MIRROR_OPENSSL_ROOT: ${{ github.workspace }}/.android-openssl
+        run: gradle assembleDebug
+      - name: Upload debug APKs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mirror-android-debug-apks
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn

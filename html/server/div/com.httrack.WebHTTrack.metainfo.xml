@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Copyright 2026 Xavier Roche <roche@httrack.com> -->
 <component type="desktop-application">
-  <id>com.httrack.WebHTTrack</id>
+  <id>com.httrack.WebMirror</id>
   <metadata_license>FSFAP</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
-  <name>WebHTTrack Website Copier</name>
+  <name>WebMirror</name>
   <summary>Copy websites to your computer for offline browsing</summary>
   <description>
     <p>
-      WebHTTrack is the web interface to HTTrack, an offline browser utility.
+      WebMirror is the web interface to Mirror, an offline browser utility.
       It downloads a website from the Internet to a local directory, fetching
       the HTML, images, and other files and rebuilding the site's link
       structure so you can browse it offline.
@@ -25,7 +25,7 @@
       <li>Updating an existing local mirror without downloading it again</li>
     </ul>
   </description>
-  <launchable type="desktop-id">WebHTTrack.desktop</launchable>
+  <launchable type="desktop-id">WebMirror.desktop</launchable>
   <categories>
     <category>Network</category>
   </categories>
@@ -56,10 +56,10 @@
     <release version="3.51.0" date="2026-10-28">
       <description>
         <ul>
-          <li>Mirror a site that needs a login: log in with your browser, use its "Copy as cURL", and paste the result into WebHTTrack. The login is saved and used again for the same site</li>
+          <li>Mirror a site that needs a login: log in with your browser, use its "Copy as cURL", and paste the result into WebMirror. The login is saved and used again for the same site</li>
           <li>The cookies file keeps each cookie's scope and expiry, and is written back at the end of the crawl</li>
           <li>Requests look more like a real browser's, with the Accept and Sec-Fetch headers a browser sends</li>
-          <li>WebHTTrack has a dark mode, themes and a user stylesheet</li>
+          <li>WebMirror has a dark mode, themes and a user stylesheet</li>
           <li>Passwords in addresses and headers are hidden from the logs, and the logs can only be read by their owner</li>
         </ul>
       </description>
@@ -91,7 +91,7 @@
         <ul>
           <li>The capture proxy that takes a URL from your browser listens on this machine only, where any host on your network could reach it before</li>
           <li>A page saved under a name the crawled site chose can no longer run commands of its own through the option that runs a program for each saved file</li>
-          <li>A site that writes a rule for HTTrack and then a rule for every crawler is read the way the standard says, so pages it allows are no longer skipped</li>
+          <li>A site that writes a rule for Mirror and then a rule for every crawler is read the way the standard says, so pages it allows are no longer skipped</li>
           <li>A crawl no longer stops when the file that reports its progress to the interface cannot be opened, or when a damaged cache is repaired</li>
           <li>More fixes to how the engine bounds what a hostile page or server sends it</li>
         </ul>
@@ -111,7 +111,7 @@
       <description>
         <ul>
           <li>A bug-fix release with no new features. A mirroring run behaves exactly as 3.50.0 did</li>
-          <li>Quitting WebHTTrack on macOS no longer leaves its icon bouncing in the Dock</li>
+          <li>Quitting WebMirror on macOS no longer leaves its icon bouncing in the Dock</li>
           <li>In a packaged install, the Help link in these pages reaches the manual again</li>
         </ul>
       </description>
@@ -120,7 +120,7 @@
       <description>
         <ul>
           <li>The version number moves to 3.50, matching the Windows and Android releases built on this engine</li>
-          <li>WebHTTrack itself is unchanged since 3.49.25</li>
+          <li>WebMirror itself is unchanged since 3.49.25</li>
         </ul>
       </description>
     </release>
@@ -141,7 +141,7 @@
           <li>A full disk is reported instead of being read as the end of a file</li>
           <li>Scripts are scanned for links whichever content type the server gives them</li>
           <li>An option written as --name=value is read as it was written</li>
-          <li>WebHTTrack help and the File menu stay reachable once a crawl has started</li>
+          <li>WebMirror help and the File menu stay reachable once a crawl has started</li>
           <li>Every language file is now stored in Unicode</li>
         </ul>
       </description>
@@ -151,7 +151,7 @@
         <ul>
           <li>A header you add by hand is no longer sent twice</li>
           <li>Rebuilding the top index no longer leaves it blank while it is being written</li>
-          <li>WebHTTrack now saves and restores the proxy, and no longer offers a mirror mode it cannot run</li>
+          <li>WebMirror now saves and restores the proxy, and no longer offers a mirror mode it cannot run</li>
           <li>Settings saved in one interface reopen unchanged in the others</li>
           <li>The language menu shows every language in its own name and script</li>
           <li>A long address or a long robots.txt rule no longer stops or misreads the mirror</li>
@@ -166,7 +166,7 @@
           <li>The footer added to mirrored pages takes named fields, so a custom one keeps working when the list grows</li>
           <li>A long address, a long filter, a large cookies file or a large robots.txt no longer stops the mirror</li>
           <li>A redirection to a long address is followed instead of being refused</li>
-          <li>Every language now has the text added since 3.49, and WebHTTrack quits when its window is closed</li>
+          <li>Every language now has the text added since 3.49, and WebMirror quits when its window is closed</li>
         </ul>
       </description>
     </release>
@@ -212,17 +212,17 @@
     <release version="3.49.18" date="2026-08-05">
       <description>
         <ul>
-          <li>The program itself is unchanged: this release only fixes building HTTrack from source on some Linux distributions and processors</li>
+          <li>The program itself is unchanged: this release only fixes building Mirror from source on some Linux distributions and processors</li>
         </ul>
       </description>
     </release>
     <release version="3.49.17" date="2026-08-05">
       <description>
         <ul>
-          <li>A mirrored page opened in your browser can no longer take control of the WebHTTrack interface</li>
+          <li>A mirrored page opened in your browser can no longer take control of the WebMirror interface</li>
           <li>Web addresses shown while a mirror runs no longer break the progress page</li>
           <li>Settings keep values containing quotes or ampersands, and Windows paths such as C:\ab</li>
-          <li>A malformed link on a crawled site can no longer alter the requests HTTrack sends</li>
+          <li>A malformed link on a crawled site can no longer alter the requests Mirror sends</li>
           <li>Crash reports name the function and source line where the problem occurred</li>
         </ul>
       </description>

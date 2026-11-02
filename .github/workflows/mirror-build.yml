@@ -1,0 +1,30 @@
+name: Mirror source build
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y autoconf automake libtool gcc g++ make pkg-config zlib1g-dev libssl-dev libbrotli-dev libzstd-dev libpsl-dev
+      - name: Bootstrap and configure
+        run: ./bootstrap && ./configure --disable-dependency-tracking
+      - name: Build original engine
+        run: make -j2
+      - name: Run original test suite
+        run: make check
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mirror-linux-test-logs
+          path: test-suite.log
+          if-no-files-found: ignore
