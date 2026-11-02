@@ -21,7 +21,7 @@ jobs:
           packages: 'platform-tools'
       - name: Install Android NDK and CMake
         run: sdkmanager "platforms;android-35" "ndk;27.2.12479018" "cmake;3.22.1"
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
       - name: Build Android OpenSSL dependencies
         env:
           MIRROR_OPENSSL_ROOT: ${{ github.workspace }}/.android-openssl
